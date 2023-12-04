@@ -1,60 +1,71 @@
 <?php
-    class useController{
-        private $_method;
-        private $_complement;
-        private $_data;
 
-        function __construct($method, $complement, $data){
-            $this->_method = $method;
-            $this->_complement = $complement == null ? 0: $complement;
-            $this->_data= $data != 0 ? $data : "" ;  
-        }
+class UserController {
+    private $method;
+    private $complement;
+    private $data;
 
-        public function index(){
-            switch($this->_method){
-                case "GET":
-                    if($this->_complement == 0){
-                        $user = useModel::getUsers(0);
-                        $json= $user;
-                        echo json_encode($json,true);
-                        return;
-                    }else{
-                        $user = useModel::getUsers($this->_complement);
-                        $json= $user;
-                        echo json_encode($json,true);
-                        return;
-                    }
-                case "POST":
-                    $craeateUser = useModel::createUser($this->generateSalting());
-                    $json = array(
-                        "response:"=> $craeateUser
-                    );
-                echo json_encode($json,true);
-                return;
-                case "UPDATE":
-                    return;
-                case "DELETE":
-                    return;
-                default:
-                    $json = array(
-                        "ruta:"=> "Delete user"
-                    );
-                    echo json_encode($json,true);
-                    return;
+    public function __construct($method, $complement, $data) {
+        $this->method = $method;
+        $this->complement = $complement ?? 0;
+        $this->data = $data ?? [];
+    }
+
+    public function handleRequest() {
+        switch ($this->method) {
+            case "GET":
+                $this->handleGetRequest();
+                break;
+            case "POST":
+                $this->handlePostRequest();
+                break;
+            case "UPDATE":
+                $this->handleUpdateRequest();
+                break;
+            case "DELETE":
+                $this->handleDeleteRequest();
+                break;
+            default:
+                $this->respondWithJson(["message" => "Invalid method"]);
         }
     }
-    private function generateSalting(){
-        $trimmedData = "";
-        if($this->_data != "" || (!empty($this->_data))) {
-            $trimmedData = array_map('trim',$this->_data);
-            $trimmedData['use_pss'] = md5($trimmedData['use_pss']);
-            //--GENERANDO SOLTING PARA CREDENCIALES
-            $identifier = str_replace("$","ue3",crypt($trimmedData["use_mail"],"ue56"));
-            $key = str_replace("$","ue2023",crypt($trimmedData["use_mail"],"56ue"));
-            $trimmedData["us_identifier"] = $identifier;
-            $trimmedData["us_key"] = $key;
-            return $trimmedData;
-        }
+
+    private function handleGetRequest() {
+        $json = useModel::getUsers($this->complement);
+        $this->respondWithJson($json);
+    }
+
+    private function handlePostRequest() {
+        $createdUser = useModel::createUser($this->generateSalting());
+        $this->respondWithJson(["response" => $createdUser]);
+    }
+
+    private function handleUpdateRequest() {
+        $this->respondWithJson(["message" => "Update not implemented"]);
+    }
+
+    private function handleDeleteRequest() {
+        $this->respondWithJson(["message" => "Delete not implemented"]);
+    }
+
+    private function generateSalting() {
+        $trimmedData = array_map('trim', $this->data);
+        $trimmedData['use_pss'] = md5($trimmedData['use_pss']);
+        $trimmedData["us_identifier"] = str_replace("$", "ue3", crypt($trimmedData["use_mail"], "ue56"));
+        $trimmedData["us_key"] = str_replace("$", "ue2023", crypt($trimmedData["use_mail"], "56ue"));
+        return $trimmedData;
+    }
+
+    private function respondWithJson($data) {
+        echo json_encode($data, true);
+        exit;
     }
 }
-?>
+
+// Ejemplo de uso:
+$method = $_SERVER['REQUEST_METHOD'];
+$complement = $_GET['complement'] ?? 0;
+$data = $_POST; // Ajusta según cómo recibas los datos en tu aplicación
+
+$userController = new UserController($method, $complement, $data);
+$userController->handleRequest();

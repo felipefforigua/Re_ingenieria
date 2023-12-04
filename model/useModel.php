@@ -1,79 +1,71 @@
 <?php
-require_once "model/ConDB.php";
-class useModel{
 
-    static public function createUser($data){
-        $cantMail= self::getMail($data["use_mail"]);
-        if($cantMail==0){
-            $query="INSERT INTO users(use_id,use_mail,use_pss,use_dateCreate,us_identifier,us_key,us_status) VALUE(NULL,:use_mail,:use_pss,:use_dateCreate,:us_identifier,:us_key,:us_status)";
-            $status ="0"; //0 -->inactivo   1-->activo
-            $stament = Connection::connecction()->prepare($query);
-            $stament->bindParam(":use_mail",$data["use_mail"],PDO::PARAM_STR);
-            $stament->bindParam(":use_pss",$data["use_pss"],PDO::PARAM_STR);
-            $stament->bindParam(":use_dateCreate",$data["use_dateCreate"],PDO::PARAM_STR);
-            $stament->bindParam(":us_identifier",$data["us_identifier"],PDO::PARAM_STR);
-            $stament->bindParam(":us_key",$data["us_key"],PDO::PARAM_STR);
-            $stament->bindParam(":us_status",$status,PDO::PARAM_STR);
-            $message = $stament->execute() ? "En ejecucion" : Connection::connecction()->errorInfo();
-            $stament->closeCursor();
-            $stament = null;
-            $query= "";
-        }else{
-            $message = "Usuario ya esta registrado";
-        }
-        return $message;
+class UserController {
+    private $method;
+    private $complement;
+    private $data;
+
+    public function __construct($method, $complement, $data) {
+        $this->method = $method;
+        $this->complement = $complement ?? 0;
+        $this->data = $data ?? [];
     }
 
-    static private function getMail($mail){
-        $query="SELECT use_mail FROM users WHERE use_mail = '$mail';";
-        $stament = Connection::connecction()->prepare($query);
-        $stament->execute();
-        $result=$stament->rowCount();
-        return $result;
-    }
-
-//----------------Traer Usuarios----------------------
-
-    static public function getUsers($id){
-        $query= "";
-        $id = is_numeric($id) ? $id : 0;
-        $query="SELECT use_id, use_mail,use_dateCreate FROM users";
-        $query.=($id> 0)? " WHERE users.use.id = '$id' AND " : "";
-        $query.=($id> 0)? "us_status='1';":" WHERE us_status = '1';";
-        //echo $query;
-        $stament = Connection::connecction()->prepare($query);
-        $stament->execute();
-        $result=$stament->fetchAll(PDO::FETCH_ASSOC);
-        return $result;
-    }
-
-    //-------------------------------LOGIN-----------------------------------------
-
-    static public function login($data){
-        $user= $data['use_mail'];
-        $pss = md5($data['use_pss']);
-        if(!empty($user) && !empty($pss)){
-            $query= "";
-            $query="SELECT us_identifier,us_key,use_id FROM users WHERE use_mail ='$user' AND use_pss='$pss' AND us_status = '1'" ;
-            $stament = Connection::connecction()->prepare($query);
-            $stament->execute();
-            $result=$stament->fetchAll(PDO::FETCH_ASSOC);
-            return $result;
-        }else{
-            $mensaje = array(
-                "COD" => "001",
-                "MENSAJE" => ("ERROR EN CREDENCIALES")
-            );
-            return $mensaje;
+    public function handleRequest() {
+        switch ($this->method) {
+            case "GET":
+                $this->handleGetRequest();
+                break;
+            case "POST":
+                $this->handlePostRequest();
+                break;
+            case "UPDATE":
+                $this->handleUpdateRequest();
+                break;
+            case "DELETE":
+                $this->handleDeleteRequest();
+                break;
+            default:
+                $this->respondWithJson(["message" => "Invalid method"]);
         }
     }
-    static public function getUsersAuth(){
-        $query ="";
-        $query ="SELECT us_identifier,us_key FROM users WHERE us_status = '1';";
-        $stament = Connection::connecction()->prepare($query);
-        $stament->execute();
-        $result=$stament->fetchAll(PDO::FETCH_ASSOC);
-        return $result;
+
+    private function handleGetRequest() {
+        $json = useModel::getUsers($this->complement);
+        $this->respondWithJson($json);
+    }
+
+    private function handlePostRequest() {
+        $createdUser = useModel::createUser($this->generateSalting());
+        $this->respondWithJson(["response" => $createdUser]);
+    }
+
+    private function handleUpdateRequest() {
+        $this->respondWithJson(["message" => "Update not implemented"]);
+    }
+
+    private function handleDeleteRequest() {
+        $this->respondWithJson(["message" => "Delete not implemented"]);
+    }
+
+    private function generateSalting() {
+        $trimmedData = array_map('trim', $this->data);
+        $trimmedData['use_pss'] = md5($trimmedData['use_pss']);
+        $trimmedData["us_identifier"] = str_replace("$", "ue3", crypt($trimmedData["use_mail"], "ue56"));
+        $trimmedData["us_key"] = str_replace("$", "ue2023", crypt($trimmedData["use_mail"], "56ue"));
+        return $trimmedData;
+    }
+
+    private function respondWithJson($data) {
+        echo json_encode($data, true);
+        exit;
     }
 }
-?>
+
+// Ejemplo de uso:
+$method = $_SERVER['REQUEST_METHOD'];
+$complement = $_GET['complement'] ?? 0;
+$data = $_POST; // Ajusta según cómo recibas los datos en tu aplicación
+
+$userController = new UserController($method, $complement, $data);
+$userController->handleRequest();
